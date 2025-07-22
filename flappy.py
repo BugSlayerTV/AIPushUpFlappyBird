@@ -1,6 +1,16 @@
 import pygame, random, time
 from pygame.locals import *
+import cv2
+import cvzone
+from cvzone.FaceMeshModule import FaceMeshDetector
+import os 
+video_capture = cv2.VideoCapture(1)
 
+face_detector = FaceMeshDetector(maxFaces=1)
+
+x=1280
+y=50
+os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (x,y)
 #VARIABLES
 SCREEN_WIDHT = 400
 SCREEN_HEIGHT = 600
@@ -172,10 +182,46 @@ while begin:
 
     pygame.display.update()
 
-
+CAN_JUMP = True
 while True:
+    
+    success, frame = video_capture.read()  
+    
+    frame, face_mesh = face_detector.findFaceMesh(frame, draw=False)
 
     clock.tick(15)
+
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord('q'):
+        break
+    if face_mesh:
+        face_points = face_mesh[0]
+
+        left_eye_point = face_points[145]
+        right_eye_point = face_points[374]
+
+        pixel_distance, _ = face_detector.findDistance(left_eye_point, right_eye_point)
+
+        real_world_width = 6.3
+
+        focal_length = 530
+
+        distance_to_face = (real_world_width * focal_length) / pixel_distance
+        if distance_to_face < 35 and CAN_JUMP:
+            bird.bump()
+            pygame.mixer.music.load(wing)
+            pygame.mixer.music.play()
+            CAN_JUMP = False
+
+        if distance_to_face > 35:
+            CAN_JUMP = True
+        cvzone.putTextRect(frame, f'Distance: {int(distance_to_face)} cm', 
+                        (face_points[10][0] - 75, face_points[10][1] - 50), scale=2, colorR=(0, 0, 255), 
+                        font=cv2.FONT_HERSHEY_PLAIN)
+
+            
+    cv2.imshow("Push-Ups Flappy Bird", frame)
+
 
     for event in pygame.event.get():
         if event.type == QUIT:
@@ -220,3 +266,6 @@ while True:
         time.sleep(1)
         break
 
+
+video_capture.release()
+cv2.destroyAllWindows()
